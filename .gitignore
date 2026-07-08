@@ -1,0 +1,36 @@
+# ===== Python / Backend =====
+backend/.env
+backend/venv/
+backend/__pycache__/
+backend/*.pyc
+backend/*.pyo
+*.egg-info/
+.eggs/
+*.egg
+
+# ===== Node / Frontend =====
+frontend/node_modules/
+frontend/dist/
+frontend/dist-ssr/
+frontend/*.local
+
+# ===== macOS =====
+.DS_Store
+**/.DS_Store
+
+# ===== Logs =====
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ===== Editor =====
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
