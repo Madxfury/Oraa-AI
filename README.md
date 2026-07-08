@@ -1,4 +1,4 @@
-# 🟢 Oraa AI
+# ˖°📸 ༘ Oraa AI
 
 <p align="center">
   <img src="frontend/public/logo.png" alt="Oraa AI Logo" width="120" />
@@ -17,6 +17,8 @@
 ---
 
 Oraa AI is an interactive web-based playground for **Qwen-Image-Edit (Icedit LoRA)**. It provides a real-time, interactive 3D camera controller that enables users to manipulate and change the camera perspective (azimuth, elevation, and distance) of any input image. 
+
+<img width="1260" height="627" alt="2026-07-08_19-46-21" src="https://github.com/user-attachments/assets/57f07f28-263b-4926-b3be-53de6d8b05f9" />
 
 The application translates intuitive 3D spatial rotations directly into prompt parameters for LoRA-based image transformation, giving you a physical, tactile way to control image editing.
 
@@ -100,18 +102,6 @@ The application translates intuitive 3D spatial rotations directly into prompt p
    npm run dev
    ```
 4. Open your browser and navigate to `http://localhost:5173/`.
-
----
-
-## 📦 Deployment
-
-### Frontend (Vercel)
-
-The frontend is ready for a seamless deployment on Vercel:
-1. Log in to [Vercel](https://vercel.com/) and import the `Madxfury/Oraa-AI` repository.
-2. Set the **Root Directory** to `frontend`.
-3. Vercel automatically detects the Vite build configuration. 
-4. Click **Deploy**. SPA fallback routing is configured automatically via `frontend/vercel.json`.
 
 ---
 
