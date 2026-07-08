@@ -52,13 +52,13 @@ export function SlidersConfiguration({
 
             {/* Azimuth Slider */}
             <div className="flex flex-col gap-2">
-                <div className="flex justify-between items-start mb-1">
-                    <div>
-                        <div className="flex items-center gap-2 mb-1.5">
-                            <span className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.5)]"></span>
-                            <span className="text-zinc-200 text-[11px] font-medium uppercase tracking-widest">Azimuth (Horizontal Selection)</span>
+                <div className="flex justify-between items-start mb-1 gap-2">
+                    <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5 sm:gap-2 mb-1">
+                            <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.5)]"></span>
+                            <span className="text-zinc-200 text-[10px] sm:text-[11px] font-medium uppercase tracking-widest truncate">Azimuth (Horizontal)</span>
                         </div>
-                        <p className="text-zinc-500 text-[10px] sm:text-[11px] font-medium tracking-wide pb-1">0°=FRONT, 90°=RIGHT, 180°=BACK, 270°=LEFT</p>
+                        <p className="text-zinc-500 text-[9px] sm:text-[10px] font-medium tracking-wide pb-1 truncate">0°=FRONT, 90°=RIGHT, 180°=BACK, 270°=LEFT</p>
                     </div>
 
                     <div className="flex bg-black/40 border border-white/5 rounded-lg overflow-hidden backdrop-blur-md">
@@ -101,13 +101,13 @@ export function SlidersConfiguration({
 
             {/* Elevation Slider */}
             <div className="flex flex-col gap-2">
-                <div className="flex justify-between items-start mb-1">
-                    <div>
-                        <div className="flex items-center gap-2 mb-1.5">
-                            <span className="w-2 h-2 rounded-full shadow-[0_0_8px_rgba(236,72,153,0.5)]" style={{ background: '#ff69b4' }}></span>
-                            <span className="text-zinc-200 text-[11px] font-medium uppercase tracking-widest">Elevation (Vertical Angle)</span>
+                <div className="flex justify-between items-start mb-1 gap-2">
+                    <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5 sm:gap-2 mb-1">
+                            <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full shadow-[0_0_8px_rgba(236,72,153,0.5)]" style={{ background: '#ff69b4' }}></span>
+                            <span className="text-zinc-200 text-[10px] sm:text-[11px] font-medium uppercase tracking-widest truncate">Elevation (Vertical)</span>
                         </div>
-                        <p className="text-zinc-500 text-[10px] sm:text-[11px] font-medium tracking-wide pb-1">-30°=LOW ANGLE, 0°=EYE LEVEL, 60°=HIGH ANGLE</p>
+                        <p className="text-zinc-500 text-[9px] sm:text-[10px] font-medium tracking-wide pb-1 truncate">-30°=LOW ANGLE, 0°=EYE LEVEL, 60°=HIGH ANGLE</p>
                     </div>
 
                     <div className="flex bg-black/40 border border-white/5 rounded-lg overflow-hidden backdrop-blur-md">
@@ -149,13 +149,13 @@ export function SlidersConfiguration({
 
             {/* Distance Slider */}
             <div className="flex flex-col gap-2">
-                <div className="flex justify-between items-start mb-1">
-                    <div>
-                        <div className="flex items-center gap-2 mb-1.5">
-                            <span className="w-2 h-2 rounded-full bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.5)]"></span>
-                            <span className="text-zinc-200 text-[11px] font-medium uppercase tracking-widest">DISTANCE</span>
+                <div className="flex justify-between items-start mb-1 gap-2">
+                    <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5 sm:gap-2 mb-1">
+                            <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.5)]"></span>
+                            <span className="text-zinc-200 text-[10px] sm:text-[11px] font-medium uppercase tracking-widest truncate">Distance</span>
                         </div>
-                        <p className="text-zinc-500 text-[10px] sm:text-[11px] font-medium tracking-wide pb-1">0.6=CLOSE-UP, 1.0=MEDIUM, 1.4=WIDE</p>
+                        <p className="text-zinc-500 text-[9px] sm:text-[10px] font-medium tracking-wide pb-1 truncate">0.6=CLOSE-UP, 1.0=MEDIUM, 1.4=WIDE</p>
                     </div>
 
                     <div className="flex bg-black/40 border border-white/5 rounded-lg overflow-hidden backdrop-blur-md">

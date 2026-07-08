@@ -140,7 +140,7 @@ export function InputImagePanel({ setInputFile, inputSrc, setInputSrc }: InputIm
                 )}
             </div>
 
-            <div className={`h-14 bg-[#09090b] border-t border-white/5 flex items-center justify-center gap-8 ${isCameraOpen ? 'opacity-50 pointer-events-none' : ''} text-zinc-400 text-xs font-medium tracking-wide relative`}>
+            <div className={`h-14 bg-[#09090b] border-t border-white/5 flex items-center justify-center gap-4 sm:gap-8 ${isCameraOpen ? 'opacity-50 pointer-events-none' : ''} text-zinc-400 text-xs font-medium tracking-wide relative`}>
                 <input
                     type="file"
                     accept="image/*"

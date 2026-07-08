@@ -52,7 +52,7 @@ export function PromptGenerator({ azimuthDeg, elevationDeg, distanceVal }: Promp
 
     return (
         <div className="bg-[#111113] border border-white/5 rounded-lg p-4">
-            <p className="font-mono text-sm text-white/80 leading-relaxed whitespace-pre-wrap">
+            <p className="font-mono text-xs sm:text-sm text-white/80 leading-relaxed whitespace-pre-wrap">
                 {promptText}
             </p>
         </div>
