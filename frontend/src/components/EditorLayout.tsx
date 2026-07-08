@@ -34,7 +34,7 @@ export function EditorLayout() {
                 azimuthDeg,
                 elevationDeg,
                 distanceVal,
-                24,
+                4,
                 3.5,
                 -1,
                 prompt,
