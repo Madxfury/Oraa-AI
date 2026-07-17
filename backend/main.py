@@ -138,6 +138,13 @@ async def call_hf_space(
 
 # ── Main endpoint ─────────────────────────────────────────────────────────────
 
+MAX_RETRIES = 2          # total attempts = MAX_RETRIES + 1
+RETRY_DELAY_S = 3        # seconds between retries
+
+# Keywords that indicate a transient GPU / quota issue worth retrying
+_TRANSIENT_KEYWORDS = ("gpu task aborted", "gpu aborted", "gpu", "quota", "exceeded", "runtime", "zerogpu")
+
+
 @app.post("/generate", response_model=GenerationResponse)
 async def generate_image(
     file: UploadFile = File(...),
@@ -170,66 +177,84 @@ async def generate_image(
 
     instruction = f"Change the camera angle: horizontal yaw {yaw}°, vertical pitch {pitch}°. {prompt}".strip()
 
-    # ── Call HuggingFace Space ───────────────────────────────────────────────
-    print(f"[hf] Calling {HF_SPACE} ...")
-    try:
-        hf_result = await asyncio.wait_for(
-            call_hf_space(
-                optimised,
-                azimuth=yaw,
-                elevation=pitch,
-                distance=distance,
-                seed=actual_seed,
-                guidance_scale=1.0,   # Qwen LoRA uses cfg=1
-                num_steps=4,
-                hf_token=hf_token_val,
-            ),
-            timeout=180,
-        )
+    # ── Call HuggingFace Space (with retry for transient GPU errors) ─────────
+    last_err: Optional[Exception] = None
 
-        out_path = hf_result.get("path")
-        if not out_path:
-            raise RuntimeError("No output from HF Space")
-
-        print(f"[hf] ✓ Success: {str(out_path)[:80]}")
-
-        # If it's a local file path read & base64 encode it
-        if out_path.startswith("/") or out_path.startswith("C:\\"):
-            with open(out_path, "rb") as f:
-                img_bytes = f.read()
-            encoded = base64.b64encode(img_bytes).decode("utf-8")
-            mime = "image/webp" if out_path.endswith(".webp") else "image/jpeg"
-            result_url = f"data:{mime};base64,{encoded}"
-        else:
-            result_url = out_path   # already a URL
-
-        return {
-            "image_base64": result_url,
-            "prompt": hf_result.get("prompt", instruction),
-            "metadata": {
-                "engine": f"huggingface/{HF_SPACE}",
-                "seed": int(hf_result.get("seed", actual_seed)),
-            },
-        }
-
-    except asyncio.TimeoutError:
-        print("[hf] Timeout after 180s")
-        raise HTTPException(status_code=504, detail="HuggingFace Space timed out after 3 minutes. Please try again later.")
-    except Exception as hf_err:
-        print(f"[hf] Error: {hf_err}")
-        err_msg = str(hf_err).lower()
-        if "quota" in err_msg or "exceeded" in err_msg or "runtime" in err_msg:
-            raise HTTPException(
-                status_code=429,
-                detail=(
-                    "The Hugging Face ZeroGPU quota has been exceeded for the default key.\n\n"
-                    "Please generate your own free Hugging Face token at https://huggingface.co/settings/tokens and paste it in the UI input box to bypass limits."
-                )
+    for attempt in range(1, MAX_RETRIES + 2):       # 1 … MAX_RETRIES+1
+        print(f"[hf] Calling {HF_SPACE} (attempt {attempt}) ...")
+        try:
+            hf_result = await asyncio.wait_for(
+                call_hf_space(
+                    optimised,
+                    azimuth=yaw,
+                    elevation=pitch,
+                    distance=distance,
+                    seed=actual_seed,
+                    guidance_scale=1.0,   # Qwen LoRA uses cfg=1
+                    num_steps=4,
+                    hf_token=hf_token_val,
+                ),
+                timeout=180,
             )
-        raise HTTPException(
-            status_code=500,
-            detail=f"Image generation failed: {hf_err}. Please try again."
-        )
+
+            out_path = hf_result.get("path")
+            if not out_path:
+                raise RuntimeError("No output from HF Space")
+
+            print(f"[hf] ✓ Success on attempt {attempt}: {str(out_path)[:80]}")
+
+            # If it's a local file path read & base64 encode it
+            if out_path.startswith("/") or out_path.startswith("C:\\"):
+                with open(out_path, "rb") as f:
+                    img_bytes = f.read()
+                encoded = base64.b64encode(img_bytes).decode("utf-8")
+                mime = "image/webp" if out_path.endswith(".webp") else "image/jpeg"
+                result_url = f"data:{mime};base64,{encoded}"
+            else:
+                result_url = out_path   # already a URL
+
+            return {
+                "image_base64": result_url,
+                "prompt": hf_result.get("prompt", instruction),
+                "metadata": {
+                    "engine": f"huggingface/{HF_SPACE}",
+                    "seed": int(hf_result.get("seed", actual_seed)),
+                },
+            }
+
+        except asyncio.TimeoutError:
+            print("[hf] Timeout after 180s")
+            raise HTTPException(status_code=504, detail="HuggingFace Space timed out after 3 minutes. Please try again later.")
+
+        except Exception as hf_err:
+            last_err = hf_err
+            err_msg = str(hf_err).lower()
+            is_transient = any(kw in err_msg for kw in _TRANSIENT_KEYWORDS)
+
+            print(f"[hf] Error (attempt {attempt}, transient={is_transient}): {hf_err}")
+
+            if is_transient and attempt <= MAX_RETRIES:
+                print(f"[hf] Retrying in {RETRY_DELAY_S}s ...")
+                await asyncio.sleep(RETRY_DELAY_S)
+                continue          # retry
+
+            # Non-transient or all retries exhausted
+            if is_transient:
+                raise HTTPException(
+                    status_code=429,
+                    detail=(
+                        "The Hugging Face ZeroGPU GPU was unavailable after multiple attempts "
+                        "(GPU task aborted / quota exceeded).\n\n"
+                        "This usually means the Space is under heavy load. You can:\n"
+                        "1. Wait a minute and try again.\n"
+                        "2. Paste your own free Hugging Face token (https://huggingface.co/settings/tokens) "
+                        "in the input box above to get your own GPU quota."
+                    )
+                )
+            raise HTTPException(
+                status_code=500,
+                detail=f"Image generation failed: {hf_err}. Please try again."
+            )
 
 
 @app.get("/health")

@@ -113,38 +113,73 @@ export const generateImage = async (
                 "multimodalart/qwen-image-multiple-angles-3d-camera",
                 { token: tokenToUse as `hf_${string}` }
             );
-            
-            const result = await app.predict("/infer_camera_edit", [
-                file,                               // image (Blob/File)
-                yaw,                                // azimuth (number)
-                pitch,                              // elevation (number)
-                distance,                           // distance (number)
-                seed === -1 ? 0 : seed,             // seed (number)
-                seed === -1,                        // randomize_seed (boolean)
-                guidance_scale,                     // guidance_scale (number)
-                steps,                              // num_inference_steps (number)
-                1024,                               // height (number)
-                1024                                // width (number)
-            ]);
 
-            const outputData = result.data as any[];
-            const outputImage = outputData?.[0];
-            const outputImageUrl = outputImage?.url;
+            const TRANSIENT_KEYWORDS = ["gpu task aborted", "gpu aborted", "quota", "exceeded", "zerogpu"];
+            const MAX_RETRIES = 2;
+            const RETRY_DELAY_MS = 3000;
+            let lastError: Error | null = null;
 
-            if (!outputImageUrl) {
-                throw new Error("No image returned from Hugging Face Space.");
+            for (let attempt = 1; attempt <= MAX_RETRIES + 1; attempt++) {
+                try {
+                    console.log(`[hf-direct] attempt ${attempt}...`);
+                    const result = await app.predict("/infer_camera_edit", [
+                        file,                               // image (Blob/File)
+                        yaw,                                // azimuth (number)
+                        pitch,                              // elevation (number)
+                        distance,                           // distance (number)
+                        seed === -1 ? 0 : seed,             // seed (number)
+                        seed === -1,                        // randomize_seed (boolean)
+                        guidance_scale,                     // guidance_scale (number)
+                        steps,                              // num_inference_steps (number)
+                        1024,                               // height (number)
+                        1024                                // width (number)
+                    ]);
+
+                    const outputData = result.data as any[];
+                    const outputImage = outputData?.[0];
+                    const outputImageUrl = outputImage?.url;
+
+                    if (!outputImageUrl) {
+                        throw new Error("No image returned from Hugging Face Space.");
+                    }
+
+                    return {
+                        image_base64: outputImageUrl,
+                        prompt: finalPrompt,
+                        metadata: {
+                            steps,
+                            guidance_scale,
+                            seed,
+                            inference_time: 0
+                        }
+                    };
+                } catch (retryErr: any) {
+                    lastError = retryErr;
+                    const msg = (retryErr?.message || String(retryErr)).toLowerCase();
+                    const isTransient = TRANSIENT_KEYWORDS.some(kw => msg.includes(kw));
+
+                    console.warn(`[hf-direct] Error (attempt ${attempt}, transient=${isTransient}):`, retryErr);
+
+                    if (isTransient && attempt <= MAX_RETRIES) {
+                        console.log(`[hf-direct] Retrying in ${RETRY_DELAY_MS}ms...`);
+                        await new Promise(r => setTimeout(r, RETRY_DELAY_MS));
+                        continue;
+                    }
+
+                    if (isTransient) {
+                        throw new Error(
+                            "GPU was unavailable after multiple attempts (GPU task aborted). " +
+                            "The Space is under heavy load — wait a minute and try again, or paste your own " +
+                            "free HuggingFace token (https://huggingface.co/settings/tokens) to get your own GPU quota."
+                        );
+                    }
+
+                    throw retryErr;
+                }
             }
 
-            return {
-                image_base64: outputImageUrl,
-                prompt: finalPrompt,
-                metadata: {
-                    steps,
-                    guidance_scale,
-                    seed,
-                    inference_time: 0
-                }
-            };
+            // Should never reach here, but just in case
+            throw lastError || new Error("Generation failed after all retries.");
         } catch (err: any) {
             console.error("Direct HF Space call failed:", err);
             throw new Error(`Generation failed: ${err.message || err}`);
