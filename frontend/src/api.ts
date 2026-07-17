@@ -130,9 +130,9 @@ export const generateImage = async (
                         seed === -1 ? 0 : seed,             // seed (number)
                         seed === -1,                        // randomize_seed (boolean)
                         guidance_scale,                     // guidance_scale (number)
-                        steps,                              // num_inference_steps (number)
-                        1024,                               // height (number)
-                        1024                                // width (number)
+                        2,                                  // num_inference_steps (optimised: was 4)
+                        512,                                // height (optimised: was 1024)
+                        512                                 // width (optimised: was 1024)
                     ]);
 
                     const outputData = result.data as any[];

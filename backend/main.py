@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 import base64
+import hashlib
 import io
 import time
 import asyncio
@@ -10,6 +11,7 @@ import os
 import tempfile
 import httpx
 from typing import Optional
+from collections import OrderedDict
 from concurrent.futures import ThreadPoolExecutor
 
 from PIL import Image
@@ -27,14 +29,87 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-MAX_SIDE     = 1024
-JPEG_QUALITY = 90
+# ── GPU-Optimised Settings ────────────────────────────────────────────────────
+# Reduced from 1024 → 512 to cut GPU time by ~4×
+MAX_SIDE       = 512
+JPEG_QUALITY   = 85
+OUTPUT_HEIGHT  = 512    # was 1024
+OUTPUT_WIDTH   = 512    # was 1024
+NUM_STEPS      = 2      # was 4 — Qwen LoRA works well at 2 steps with cfg=1
+GUIDANCE_SCALE = 1.0    # Qwen LoRA default
 
 # Thread pool for blocking Gradio Client calls
 _executor = ThreadPoolExecutor(max_workers=4)
 
 HF_SPACE = "multimodalart/qwen-image-multiple-angles-3d-camera"
 
+# ── Token Rotation Pool ───────────────────────────────────────────────────────
+# Supports comma-separated tokens in HF_TOKENS env var, falls back to HF_TOKEN
+_token_pool: list[str] = []
+_token_index = 0
+
+def _load_token_pool():
+    """Load HF tokens from env. Supports HF_TOKENS (comma-separated) and HF_TOKEN (single)."""
+    global _token_pool
+    pool_str = os.getenv("HF_TOKENS", "").strip()
+    if pool_str:
+        _token_pool = [t.strip() for t in pool_str.split(",") if t.strip()]
+    if not _token_pool:
+        single = os.getenv("HF_TOKEN", "").strip()
+        if single:
+            _token_pool = [single]
+    print(f"[tokens] Loaded {len(_token_pool)} token(s) into rotation pool")
+
+_load_token_pool()
+
+def _next_pool_token() -> Optional[str]:
+    """Round-robin through the token pool."""
+    global _token_index
+    if not _token_pool:
+        return None
+    token = _token_pool[_token_index % len(_token_pool)]
+    _token_index += 1
+    return token
+
+
+# ── In-Memory LRU Cache ──────────────────────────────────────────────────────
+CACHE_MAX_SIZE = 20
+CACHE_TTL_S    = 1800   # 30 minutes
+
+_cache: OrderedDict[str, dict] = OrderedDict()
+
+def _cache_key(image_bytes: bytes, azimuth: float, elevation: float, distance: float) -> str:
+    """Create a deterministic cache key from input image + camera params."""
+    h = hashlib.sha256()
+    h.update(image_bytes)
+    h.update(f"{azimuth:.2f}:{elevation:.2f}:{distance:.2f}".encode())
+    return h.hexdigest()
+
+def _cache_get(key: str) -> Optional[dict]:
+    """Get a cached result if it exists and hasn't expired."""
+    if key in _cache:
+        entry = _cache[key]
+        if time.time() - entry["_ts"] < CACHE_TTL_S:
+            _cache.move_to_end(key)
+            print(f"[cache] HIT {key[:12]}...")
+            return entry
+        else:
+            del _cache[key]
+            print(f"[cache] EXPIRED {key[:12]}...")
+    return None
+
+def _cache_put(key: str, value: dict):
+    """Store a result in the cache, evicting oldest if full."""
+    value["_ts"] = time.time()
+    _cache[key] = value
+    _cache.move_to_end(key)
+    while len(_cache) > CACHE_MAX_SIZE:
+        evicted_key, _ = _cache.popitem(last=False)
+        print(f"[cache] EVICTED {evicted_key[:12]}...")
+    print(f"[cache] PUT {key[:12]}... (size={len(_cache)})")
+
+
+# ── Image Preparation ─────────────────────────────────────────────────────────
 
 def prepare_image_bytes(raw: bytes) -> bytes:
     img = Image.open(io.BytesIO(raw)).convert("RGB")
@@ -79,7 +154,7 @@ def _call_hf_space_sync(
     try:
         hf_token_resolved = hf_token or os.getenv("HF_TOKEN") or os.getenv("HUGGINGFACE_CO_TOKEN")
         client = Client(HF_SPACE, token=hf_token_resolved, verbose=False)
-        print(f"[hf] Gradio sending tmp file {tmp_path} ...")
+        print(f"[hf] Gradio sending tmp file {tmp_path} (steps={num_steps}, {OUTPUT_WIDTH}×{OUTPUT_HEIGHT}) ...")
         result = client.predict(
             image=handle_file(tmp_path),
             azimuth=float(azimuth),
@@ -89,8 +164,8 @@ def _call_hf_space_sync(
             randomize_seed=seed == -1,
             guidance_scale=float(guidance_scale),
             num_inference_steps=int(num_steps),
-            height=1024,
-            width=1024,
+            height=OUTPUT_HEIGHT,
+            width=OUTPUT_WIDTH,
             api_name="/infer_camera_edit",
         )
         print(f"[hf] Raw result type: {type(result)}")
@@ -151,7 +226,7 @@ async def generate_image(
     yaw: float = Form(0.0),       # maps to azimuth
     pitch: float = Form(0.0),     # maps to elevation
     distance: float = Form(1.0),
-    steps: int = Form(4),
+    steps: int = Form(2),         # default lowered from 4 → 2
     guidance_scale: float = Form(1.0),
     seed: int = Form(-1),
     prompt: str = Form(""),
@@ -160,20 +235,31 @@ async def generate_image(
     raw_contents = await file.read()
     actual_seed  = seed if seed != -1 else int(time.time() * 1000) % 2147483647
 
-    # Prepare image
+    # Prepare image (now caps at 512px)
     try:
         optimised = prepare_image_bytes(raw_contents)
     except Exception:
         optimised = raw_contents
     print(f"[img] {len(raw_contents)//1024}kB → {len(optimised)//1024}kB")
 
-    # Resolve HF token (UI field wins, then .env default, then default token)
+    # ── Check cache first ────────────────────────────────────────────────────
+    ckey = _cache_key(optimised, yaw, pitch, distance)
+    cached = _cache_get(ckey)
+    if cached:
+        return {
+            "image_base64": cached["image_base64"],
+            "prompt": cached["prompt"],
+            "metadata": {**cached["metadata"], "cached": True},
+        }
+
+    # ── Resolve HF token ─────────────────────────────────────────────────────
+    # Priority: user-pasted token > rotation pool > .env single token
     hf_token_val = (hf_token or "").strip()
     if not hf_token_val:
-        hf_token_val = os.getenv("HF_TOKEN", "").strip()
+        hf_token_val = _next_pool_token() or ""
 
     key_preview = (hf_token_val[:8] + "...") if len(hf_token_val) > 8 else "(none)"
-    print(f"[hf_token] {key_preview}  (len={len(hf_token_val)})")
+    print(f"[hf_token] {key_preview}  (len={len(hf_token_val)}, pool_size={len(_token_pool)})")
 
     instruction = f"Change the camera angle: horizontal yaw {yaw}°, vertical pitch {pitch}°. {prompt}".strip()
 
@@ -181,7 +267,12 @@ async def generate_image(
     last_err: Optional[Exception] = None
 
     for attempt in range(1, MAX_RETRIES + 2):       # 1 … MAX_RETRIES+1
-        print(f"[hf] Calling {HF_SPACE} (attempt {attempt}) ...")
+        # On retry, try a different token from the pool
+        if attempt > 1 and not (hf_token or "").strip():
+            hf_token_val = _next_pool_token() or hf_token_val
+            print(f"[hf] Rotating to next token: {hf_token_val[:8]}...")
+
+        print(f"[hf] Calling {HF_SPACE} (attempt {attempt}, steps={NUM_STEPS}, {OUTPUT_WIDTH}×{OUTPUT_HEIGHT}) ...")
         try:
             hf_result = await asyncio.wait_for(
                 call_hf_space(
@@ -190,8 +281,8 @@ async def generate_image(
                     elevation=pitch,
                     distance=distance,
                     seed=actual_seed,
-                    guidance_scale=1.0,   # Qwen LoRA uses cfg=1
-                    num_steps=4,
+                    guidance_scale=GUIDANCE_SCALE,
+                    num_steps=NUM_STEPS,
                     hf_token=hf_token_val,
                 ),
                 timeout=180,
@@ -213,14 +304,21 @@ async def generate_image(
             else:
                 result_url = out_path   # already a URL
 
-            return {
+            response_data = {
                 "image_base64": result_url,
                 "prompt": hf_result.get("prompt", instruction),
                 "metadata": {
                     "engine": f"huggingface/{HF_SPACE}",
                     "seed": int(hf_result.get("seed", actual_seed)),
+                    "steps": NUM_STEPS,
+                    "resolution": f"{OUTPUT_WIDTH}x{OUTPUT_HEIGHT}",
                 },
             }
+
+            # Store in cache
+            _cache_put(ckey, response_data)
+
+            return response_data
 
         except asyncio.TimeoutError:
             print("[hf] Timeout after 180s")
