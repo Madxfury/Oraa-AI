@@ -62,7 +62,7 @@ export const generateImage = async (
             console.log("Calling backend to generate image:", endpointUrl);
 
             const controller = new AbortController();
-            const timeoutId = window.setTimeout(() => controller.abort(), 150000);
+            const timeoutId = window.setTimeout(() => controller.abort(), 200000);
 
             const response = await fetch(endpointUrl, {
                 method: "POST",
@@ -95,7 +95,7 @@ export const generateImage = async (
             console.error("Backend API Error:", error);
 
             if (error?.name === "AbortError") {
-                throw new Error(`Request timed out. Backend: ${backendUrl}. Try again in a moment.`);
+                throw new Error("Request timed out — the HuggingFace GPU may be cold-starting. Please try again in ~30 seconds.");
             }
             throw error;
         }
