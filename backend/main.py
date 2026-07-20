@@ -33,15 +33,18 @@ app.add_middleware(
 # Reduced from 1024 → 512 to cut GPU time by ~4×
 MAX_SIDE       = 512
 JPEG_QUALITY   = 85
-OUTPUT_HEIGHT  = 512    # was 1024
-OUTPUT_WIDTH   = 512    # was 1024
-NUM_STEPS      = 2      # was 4 — Qwen LoRA works well at 2 steps with cfg=1
-GUIDANCE_SCALE = 1.0    # Qwen LoRA default
+OUTPUT_HEIGHT  = 1024
+OUTPUT_WIDTH   = 1024
+NUM_STEPS      = 4
+GUIDANCE_SCALE = 1.0
 
 # Thread pool for blocking Gradio Client calls
 _executor = ThreadPoolExecutor(max_workers=4)
 
-HF_SPACE = "multimodalart/qwen-image-multiple-angles-3d-camera"
+HF_SPACES = [
+    "mobowuhan/qwen-image-multiple-angles-3d-camera",
+    "multimodalart/qwen-image-multiple-angles-3d-camera",
+]
 
 # ── Token Rotation Pool ───────────────────────────────────────────────────────
 # Supports comma-separated tokens in HF_TOKENS env var, falls back to HF_TOKEN
@@ -139,6 +142,7 @@ def _call_hf_space_sync(
     guidance_scale: float,
     num_steps: int,
     hf_token: Optional[str] = None,
+    hf_space: str = "multimodalart/qwen-image-multiple-angles-3d-camera",
 ) -> dict:
     """
     Synchronous call to the HuggingFace Space gradio API.
@@ -153,8 +157,8 @@ def _call_hf_space_sync(
 
     try:
         hf_token_resolved = hf_token or os.getenv("HF_TOKEN") or os.getenv("HUGGINGFACE_CO_TOKEN")
-        client = Client(HF_SPACE, token=hf_token_resolved, verbose=False)
-        print(f"[hf] Gradio sending tmp file {tmp_path} (steps={num_steps}, {OUTPUT_WIDTH}×{OUTPUT_HEIGHT}) ...")
+        client = Client(hf_space, token=hf_token_resolved, verbose=True)
+        print(f"[hf] Gradio sending tmp file {tmp_path} (steps={num_steps}, {OUTPUT_WIDTH}×{OUTPUT_HEIGHT}) to {hf_space} ...")
         result = client.predict(
             image=handle_file(tmp_path),
             azimuth=float(azimuth),
@@ -201,23 +205,23 @@ async def call_hf_space(
     guidance_scale: float,
     num_steps: int,
     hf_token: Optional[str] = None,
+    hf_space: str = "multimodalart/qwen-image-multiple-angles-3d-camera",
 ) -> dict:
     """Async wrapper around the blocking Gradio Client call."""
     loop = asyncio.get_event_loop()
     return await loop.run_in_executor(
         _executor,
         _call_hf_space_sync,
-        image_bytes, azimuth, elevation, distance, seed, guidance_scale, num_steps, hf_token,
+        image_bytes, azimuth, elevation, distance, seed, guidance_scale, num_steps, hf_token, hf_space
     )
-
-
+    
 # ── Main endpoint ─────────────────────────────────────────────────────────────
 
-MAX_RETRIES = 2          # total attempts = MAX_RETRIES + 1
-RETRY_DELAY_S = 3        # seconds between retries
+MAX_RETRIES = 1          # total attempts = MAX_RETRIES + 1 (try both Spaces)
+RETRY_DELAY_S = 2        # seconds between retries
 
 # Keywords that indicate a transient GPU / quota issue worth retrying
-_TRANSIENT_KEYWORDS = ("gpu task aborted", "gpu aborted", "gpu", "quota", "exceeded", "runtime", "zerogpu")
+_TRANSIENT_KEYWORDS = ("gpu task aborted", "gpu aborted", "gpu", "quota", "exceeded", "runtime", "zerogpu", "accelerator")
 
 
 @app.post("/generate", response_model=GenerationResponse)
@@ -267,12 +271,15 @@ async def generate_image(
     last_err: Optional[Exception] = None
 
     for attempt in range(1, MAX_RETRIES + 2):       # 1 … MAX_RETRIES+1
+        # Rotate Space: try primary multimodalart first, then fallbacks
+        current_space = HF_SPACES[(attempt - 1) % len(HF_SPACES)]
+
         # On retry, try a different token from the pool
         if attempt > 1 and not (hf_token or "").strip():
             hf_token_val = _next_pool_token() or hf_token_val
             print(f"[hf] Rotating to next token: {hf_token_val[:8]}...")
 
-        print(f"[hf] Calling {HF_SPACE} (attempt {attempt}, steps={NUM_STEPS}, {OUTPUT_WIDTH}×{OUTPUT_HEIGHT}) ...")
+        print(f"[hf] Calling {current_space} (attempt {attempt}, steps={NUM_STEPS}, {OUTPUT_WIDTH}×{OUTPUT_HEIGHT}) ...")
         try:
             hf_result = await asyncio.wait_for(
                 call_hf_space(
@@ -284,6 +291,7 @@ async def generate_image(
                     guidance_scale=GUIDANCE_SCALE,
                     num_steps=NUM_STEPS,
                     hf_token=hf_token_val,
+                    hf_space=current_space,
                 ),
                 timeout=180,
             )
@@ -308,7 +316,7 @@ async def generate_image(
                 "image_base64": result_url,
                 "prompt": hf_result.get("prompt", instruction),
                 "metadata": {
-                    "engine": f"huggingface/{HF_SPACE}",
+                    "engine": f"huggingface/{current_space}",
                     "seed": int(hf_result.get("seed", actual_seed)),
                     "steps": NUM_STEPS,
                     "resolution": f"{OUTPUT_WIDTH}x{OUTPUT_HEIGHT}",

@@ -104,9 +104,9 @@ export const generateImage = async (
         try {
             console.log("Directly calling Hugging Face Space from browser...");
             const { Client } = await import("@gradio/client");
-            
-            const tokenToUse = (hfToken && hfToken.trim() !== "") 
-                ? hfToken.trim() 
+
+            const tokenToUse = (hfToken && hfToken.trim() !== "")
+                ? hfToken.trim()
                 : "";
 
             const app = await Client.connect(
@@ -130,9 +130,9 @@ export const generateImage = async (
                         seed === -1 ? 0 : seed,             // seed (number)
                         seed === -1,                        // randomize_seed (boolean)
                         guidance_scale,                     // guidance_scale (number)
-                        2,                                  // num_inference_steps (optimised: was 4)
-                        512,                                // height (optimised: was 1024)
-                        512                                 // width (optimised: was 1024)
+                        steps,                              // num_inference_steps (number)
+                        1024,                               // height (number)
+                        1024                                // width (number)
                     ]);
 
                     const outputData = result.data as any[];
