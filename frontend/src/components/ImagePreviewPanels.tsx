@@ -171,16 +171,7 @@ export function InputImagePanel({ setInputFile, inputSrc, setInputSrc }: InputIm
     );
 }
 
-const HINTS = [
-    'Analyzing composition…',
-    'Adjusting camera angle…',
-    'Synthesizing view…',
-    'Refining details…',
-    'Almost there…',
-];
-
-function ProcessingAnimation({ elapsedSeconds }: { elapsedSeconds: number }) {
-    const hint = HINTS[Math.floor(elapsedSeconds / 4) % HINTS.length];
+function ProcessingAnimation({ elapsedSeconds, message }: { elapsedSeconds: number; message: string }) {
 
     return (
         <div className="absolute inset-0 bg-zinc-950 flex flex-col items-center justify-center overflow-hidden">
@@ -243,11 +234,11 @@ function ProcessingAnimation({ elapsedSeconds }: { elapsedSeconds: number }) {
                         Processing
                     </span>
                     <span
-                        key={hint}
+                        key={message}
                         className="text-zinc-500 text-[10px] tracking-wide transition-all duration-700"
                         style={{ minWidth: '140px', textAlign: 'center' }}
                     >
-                        {hint}
+                        {message}
                     </span>
                 </div>
             </div>
@@ -269,31 +260,27 @@ function ProcessingAnimation({ elapsedSeconds }: { elapsedSeconds: number }) {
 export interface OutputImagePanelProps {
     isGenerating: boolean;
     outputUrl: string | null;
+    generationMessage?: string;
 }
 
-export function OutputImagePanel({ isGenerating, outputUrl }: OutputImagePanelProps) {
+export function OutputImagePanel({ isGenerating, outputUrl, generationMessage }: OutputImagePanelProps) {
     const [elapsedSeconds, setElapsedSeconds] = useState(0);
-    const [isImageLoading, setIsImageLoading] = useState(false);
+    const [loadedUrl, setLoadedUrl] = useState<string | null>(null);
+    const [failedUrl, setFailedUrl] = useState<string | null>(null);
     const [isFullscreen, setIsFullscreen] = useState(false);
 
-    useEffect(() => {
-        if (isGenerating) {
-            setIsImageLoading(true);
-            setElapsedSeconds(0);
-        }
-    }, [isGenerating]);
-
-    const showLoadingState = isGenerating || (!!outputUrl && isImageLoading);
+    const showLoadingState = isGenerating || (!!outputUrl && outputUrl !== loadedUrl && outputUrl !== failedUrl);
 
     useEffect(() => {
         let interval: number;
         if (showLoadingState) {
+            const started = Date.now();
             interval = window.setInterval(() => {
-                setElapsedSeconds(prev => prev + 1);
+                setElapsedSeconds(Math.floor((Date.now() - started) / 1000));
             }, 1000);
         }
         return () => window.clearInterval(interval);
-    }, [showLoadingState]);
+    }, [showLoadingState, isGenerating]);
 
     const handleDownload = async () => {
         if (!outputUrl) return;
@@ -344,7 +331,7 @@ export function OutputImagePanel({ isGenerating, outputUrl }: OutputImagePanelPr
                 </div>
 
                 {/* Action Buttons — only visible when output is ready */}
-                {outputUrl && !showLoadingState && (
+                {outputUrl && outputUrl !== failedUrl && !showLoadingState && (
                     <div className="absolute top-4 right-4 z-10 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                         {/* Fullscreen */}
                         <button
@@ -367,13 +354,13 @@ export function OutputImagePanel({ isGenerating, outputUrl }: OutputImagePanelPr
 
                 <div className="flex-1 w-full relative bg-zinc-950 overflow-hidden flex items-center justify-center p-8">
                     {/* Output Image */}
-                    {outputUrl && (
+                    {outputUrl && outputUrl !== failedUrl && (
                         <img
                             src={outputUrl}
                             alt="Generated output"
                             className={`w-full h-full object-contain drop-shadow-2xl transition-all duration-700 ${showLoadingState ? 'opacity-0 absolute hidden' : 'opacity-100'}`}
-                            onLoad={() => setIsImageLoading(false)}
-                            onError={() => setIsImageLoading(false)}
+                            onLoad={() => setLoadedUrl(outputUrl)}
+                            onError={() => setFailedUrl(outputUrl)}
                         />
                     )}
 
@@ -386,12 +373,18 @@ export function OutputImagePanel({ isGenerating, outputUrl }: OutputImagePanelPr
                         </div>
                     )}
 
+                    {outputUrl && outputUrl === failedUrl && !isGenerating && (
+                        <p role="alert" className="text-sm text-red-300 text-center">
+                            The generated image could not be displayed. Please generate it again.
+                        </p>
+                    )}
+
                     {showLoadingState && (
-                        <ProcessingAnimation elapsedSeconds={elapsedSeconds} />
+                        <ProcessingAnimation elapsedSeconds={elapsedSeconds}
+                            message={isGenerating ? generationMessage || 'Waiting for image generation…' : 'Loading your image…'} />
                     )}
                 </div>
             </div>
         </>
     );
 }
-

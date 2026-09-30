@@ -1,15 +1,20 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Camera3DControl } from './Camera3DControl';
 import { SlidersConfiguration } from './SlidersConfiguration';
 import { InputImagePanel, OutputImagePanel } from './ImagePreviewPanels';
 import { PromptGenerator, generatePromptText } from './PromptGenerator';
 import { generateImage } from '../api';
+import type { GenerationProgress } from '../api';
 export function EditorLayout() {
     const [isGenerating, setIsGenerating] = useState(false);
     const [inputFile, setInputFile] = useState<File | null>(null);
     const [inputSrc, setInputSrc] = useState<string | null>(null);
     const [outputUrl, setOutputUrl] = useState<string | null>(null);
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
+    const [progress, setProgress] = useState<GenerationProgress | null>(null);
+    const activeRequest = useRef<AbortController | null>(null);
+
+    useEffect(() => () => activeRequest.current?.abort(), []);
 
     // Core parameters state
     const [azimuthDeg, setAzimuthDeg] = useState(0);
@@ -18,11 +23,14 @@ export function EditorLayout() {
     const [hfToken, setHfToken] = useState("");
 
     const handleGenerate = async () => {
+        if (activeRequest.current) return;
         if (!inputFile) {
             setErrorMsg("Please upload an image first.");
             return;
         }
 
+        const controller = new AbortController();
+        activeRequest.current = controller;
         setIsGenerating(true);
         setErrorMsg(null);
         setOutputUrl(null);
@@ -35,21 +43,25 @@ export function EditorLayout() {
                 elevationDeg,
                 distanceVal,
                 4,
-                3.5,
+                1.0,
                 -1,
                 prompt,
-                hfToken
+                hfToken,
+                { signal: controller.signal, onProgress: setProgress }
             );
 
             if (response.image_base64) {
                 setOutputUrl(response.image_base64);
             }
         } catch (error: unknown) {
+            if (error instanceof DOMException && error.name === 'AbortError') return;
             console.error("Failed to generate image:", error);
             const err = error as { response?: { data?: { detail?: string } }; message?: string };
             const backendError = err.response?.data?.detail || err.message || "Generation failed. Please try again.";
             setErrorMsg(backendError);
         } finally {
+            activeRequest.current = null;
+            setProgress(null);
             setIsGenerating(false);
         }
     };
@@ -68,10 +80,11 @@ export function EditorLayout() {
             <div className="flex flex-col sm:flex-row items-end justify-center w-full max-w-[800px] mx-auto mb-4 gap-3 sm:gap-4 px-4">
                 <div className="w-full sm:w-2/3 flex flex-col gap-1.5 pt-2">
                     <label className="text-[10px] sm:text-[11px] font-medium text-zinc-400 tracking-wide text-left ml-2">
-                        Hugging Face Token <span className="text-emerald-500 text-[10px]">(default active — paste yours if rate limit is exceeded)</span>
+                        Hugging Face Token <span className="text-emerald-500 text-[10px]">(optional — use your account's GPU quota)</span>
                     </label>
                     <input
-                        type="text"
+                        type="password"
+                        autoComplete="off"
                         placeholder="Paste your Hugging Face Token (hf_...) [optional]"
                         value={hfToken}
                         onChange={(e) => setHfToken(e.target.value)}
@@ -92,6 +105,14 @@ export function EditorLayout() {
                         <>Generate Angle</>
                     )}
                 </button>
+                {isGenerating && (
+                    <button
+                        onClick={() => activeRequest.current?.abort(new DOMException('Generation cancelled.', 'AbortError'))}
+                        className="py-3 px-4 text-sm text-zinc-300 hover:text-white border border-white/10 rounded-2xl"
+                    >
+                        Cancel
+                    </button>
+                )}
             </div>
 
             {/* 2x2 Layout Grid */}
@@ -137,6 +158,7 @@ export function EditorLayout() {
                     <OutputImagePanel
                         isGenerating={isGenerating}
                         outputUrl={outputUrl}
+                        generationMessage={progress?.message}
                     />
 
                     <div className="bg-[#09090b] border border-white/5 rounded-2xl overflow-hidden flex flex-col relative flex-1 p-4 sm:p-6 pt-14 sm:pt-16">

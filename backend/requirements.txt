@@ -7,4 +7,5 @@ python-dotenv
 requests
 httpx
 huggingface_hub
+gradio-client>=2.4.0,<3
 fal-client

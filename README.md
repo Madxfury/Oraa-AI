@@ -41,7 +41,7 @@ The application translates intuitive 3D spatial rotations directly into prompt p
 - **3D Graphics:** Three.js + React Three Fiber (R3F) + Drei
 
 ### Backend
-- **Framework:** FastAPI (Python 3.9+)
+- **Framework:** FastAPI (Python 3.10+)
 - **Networking:** HTTPX + Gradio Client
 - **Image Processing:** Pillow (PIL)
 - **Secrets:** python-dotenv
@@ -52,7 +52,7 @@ The application translates intuitive 3D spatial rotations directly into prompt p
 
 ### Prerequisites
 - [Node.js](https://nodejs.org/) (v18+)
-- [Python](https://www.python.org/) (3.9+)
+- [Python](https://www.python.org/) (3.10+)
 - A [Hugging Face User Access Token](https://huggingface.co/settings/tokens)
 
 ---
@@ -80,7 +80,7 @@ The application translates intuitive 3D spatial rotations directly into prompt p
    ```env
    HF_TOKEN=your_huggingface_token_here
    ```
-5. Run the FastAPI development server:
+5. Run the FastAPI development server (use one worker for the in-memory job queue):
    ```bash
    uvicorn main:app --reload --port 8000
    ```
@@ -104,6 +104,36 @@ The application translates intuitive 3D spatial rotations directly into prompt p
 4. Open your browser and navigate to `http://localhost:5173/`.
 
 ---
+
+## Image generation reliability
+
+The editor submits a background job and polls its status, so GPU queue waits do not hold a single browser request open. It shows the real queue state, supports cancellation, and tries each configured Hugging Face Space once. Each Space has an 80-second deadline; the complete backend job has a 180-second limit. Browser requests have a 200-second overall limit. Cancellation removes queued jobs where the upstream service supports it; inference already running on a GPU can continue remotely.
+
+The free Hugging Face path uses the Space's Lightning settings: four steps, guidance 1.0, and a 512px maximum output side by default. To request larger output through the backend, set `IMAGE_OUTPUT_SIZE=1024` in `backend/.env` and restart it. The browser-only fallback also uses 512px output and bounded, cancellable requests. Generated images are downloaded before success is reported. Invalid uploads are rejected instead of being sent to a GPU.
+
+Hugging Face ZeroGPU is a shared, quota-limited service. A token uses that account's quota; creating several tokens for the same account does not add GPU time. The UI reports exhausted quota and unavailable GPUs as terminal errors. Set `HF_SPACE` or `HF_SPACES` to use a deployment you control.
+
+For a dedicated paid alternative, the backend supports [fal's Qwen camera-angle API](https://fal.ai/models/fal-ai/qwen-image-edit-2511-multiple-angles/api). Enable it explicitly in `backend/.env`:
+
+```env
+IMAGE_PROVIDER=fal
+FAL_KEY=your_fal_api_key
+```
+
+Restart the backend after changing configuration. This path uses fal's regular-model settings (28 steps, guidance 4.5), maps Oraa's camera distance to fal's zoom scale, and retains the same job status and Cancel controls. It requires API credits. Keep `FAL_KEY` in the backend; never put it in a `VITE_*` environment variable. The default `IMAGE_PROVIDER=huggingface` makes no paid API calls.
+
+Regression checks:
+
+```bash
+cd backend
+./venv/bin/python -m unittest discover -s tests -v
+cd ../frontend
+npm test
+npm run lint
+npm run build
+```
+
+Job results are kept in memory for ten minutes and up to twenty completed jobs. Restarting the backend clears them. Multiple backend workers would need a shared queue and result store.
 
 ## 🤝 Contributing
 
