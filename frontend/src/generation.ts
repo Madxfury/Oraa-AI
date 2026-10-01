@@ -1,6 +1,9 @@
 import type { Client } from '@gradio/client';
 type GradioEvent = ReturnType<Client['submit']> extends AsyncIterable<infer Event> ? Event : never;
 
+export type GenerationQuality = 'fast' | 'balanced';
+export const GENERATION_SIZES: Record<GenerationQuality, number> = { fast: 384, balanced: 512 };
+
 export interface GenerateResponse {
     image_base64: string;
     prompt: string;

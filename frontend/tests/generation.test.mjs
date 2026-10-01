@@ -126,6 +126,7 @@ test('the editor API uses job polling and sends the requested camera settings', 
         assert.equal(calls[1][0], 'http://test/generations');
         assert.equal(calls[1][1].body.get('guidance_scale'), '1');
         assert.equal(calls[1][1].body.get('distance'), '1.4');
+        assert.equal(calls[1][1].body.get('output_size'), '512');
         assert.equal(calls.length, 2);
     });
 });
@@ -133,6 +134,19 @@ test('the editor API uses job polling and sends the requested camera settings', 
 test('an old backend prompts a restart instead of silently using the broken endpoint', async () => {
     await withFakeFetch(async () => jsonResponse({ status: 'ok' }), async () => {
         await assert.rejects(generateImage(new File(['image'], 'input.png'), 0, 0, 1, 4, 1, -1, ''), /Restart the Oraa AI backend/);
+    });
+});
+
+test('Fast mode requests a smaller image without reducing the Lightning step count', async () => {
+    let payload;
+    await withFakeFetch(async (url, options) => {
+        if (url.endsWith('/health')) return jsonResponse({ generation_api: 'jobs-v1' });
+        payload = options.body;
+        return jsonResponse({ id: 'fast-job', stage: 'complete', result: imageResult }, 202);
+    }, async () => {
+        await generateImage(new File(['image'], 'input.png'), 0, 0, 1, 4, 1, -1, '', undefined, { quality: 'fast' });
+        assert.equal(payload.get('output_size'), '384');
+        assert.equal(payload.get('steps'), '4');
     });
 });
 

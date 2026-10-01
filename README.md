@@ -109,7 +109,9 @@ The application translates intuitive 3D spatial rotations directly into prompt p
 
 The editor submits a background job and polls its status, so GPU queue waits do not hold a single browser request open. It shows the real queue state, supports cancellation, and tries each configured Hugging Face Space once. Each Space has an 80-second deadline; the complete backend job has a 180-second limit. Browser requests have a 200-second overall limit. Cancellation removes queued jobs where the upstream service supports it; inference already running on a GPU can continue remotely.
 
-The free Hugging Face path uses the Space's Lightning settings: four steps, guidance 1.0, and a 512px maximum output side by default. To request larger output through the backend, set `IMAGE_OUTPUT_SIZE=1024` in `backend/.env` and restart it. The browser-only fallback also uses 512px output and bounded, cancellable requests. Generated images are downloaded before success is reported. Invalid uploads are rejected instead of being sent to a GPU.
+The editor defaults to **Fast** previews (384px maximum output side); choose **Balanced** (512px) for more detail. A square 384px preview has about 44% fewer pixels than a 512px image, reducing generation work without changing the four-step Lightning adapter settings. Actual latency still depends on GPU availability and queue time. Both modes work through the backend, browser-only Hugging Face fallback, and optional fal provider.
+
+The free Hugging Face path uses four steps and guidance 1.0. The backend accepts an optional `output_size` form field (256–1024, multiples of 16); requests without it use `IMAGE_OUTPUT_SIZE` (default 512). Output width and height follow the input aspect ratio, with a 256px minimum side. Generated images are downloaded before success is reported. Invalid uploads are rejected instead of being sent to a GPU.
 
 Hugging Face ZeroGPU is a shared, quota-limited service. A token uses that account's quota; creating several tokens for the same account does not add GPU time. The UI reports exhausted quota and unavailable GPUs as terminal errors. Set `HF_SPACE` or `HF_SPACES` to use a deployment you control.
 

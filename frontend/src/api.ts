@@ -1,6 +1,6 @@
-import { errorMessage, pollGeneration, readPrediction, requestJson, spaceDistance, withDeadline } from './generation';
-import type { GenerateResponse, GenerationJob, GenerationProgress } from './generation';
-export type { GenerateResponse, GenerationProgress } from './generation';
+import { GENERATION_SIZES, errorMessage, pollGeneration, readPrediction, requestJson, spaceDistance, withDeadline } from './generation';
+import type { GenerateResponse, GenerationJob, GenerationProgress, GenerationQuality } from './generation';
+export type { GenerateResponse, GenerationProgress, GenerationQuality } from './generation';
 
 const SPACES = [
     'multimodalart/qwen-image-multiple-angles-3d-camera',
@@ -10,11 +10,12 @@ const SPACE_TIMEOUT_MS = 80000;
 const GENERATION_TIMEOUT_MS = 200000;
 
 interface GenerationOptions {
+    quality?: GenerationQuality;
     signal?: AbortSignal;
     onProgress?: (progress: GenerationProgress) => void;
 }
 
-async function prepareImage(file: File, signal: AbortSignal) {
+async function prepareImage(file: File, signal: AbortSignal, outputSize: number) {
     if (file.size > 20 * 1024 * 1024) throw new Error('Please upload an image smaller than 20 MB.');
     const bitmap = await withDeadline(createImageBitmap(file, { imageOrientation: 'from-image' }), 10000, signal);
     try {
@@ -30,7 +31,7 @@ async function prepareImage(file: File, signal: AbortSignal) {
         const blob = await withDeadline(new Promise<Blob>((resolve, reject) => {
             canvas.toBlob(value => value ? resolve(value) : reject(new Error('Could not prepare the image.')), 'image/jpeg', 0.85);
         }), 10000, signal);
-        const outputScale = 512 / Math.max(canvas.width, canvas.height);
+        const outputScale = outputSize / Math.max(canvas.width, canvas.height);
         return { file: new File([blob], 'input.jpg', { type: 'image/jpeg' }),
             width: Math.max(256, Math.round(canvas.width * outputScale / 16) * 16),
             height: Math.max(256, Math.round(canvas.height * outputScale / 16) * 16) };
@@ -42,11 +43,11 @@ async function prepareImage(file: File, signal: AbortSignal) {
 async function generateDirect(
     file: File, yaw: number, pitch: number, distance: number, steps: number,
     guidanceScale: number, seed: number, prompt: string, hfToken: string | undefined,
-    signal: AbortSignal, onProgress?: (progress: GenerationProgress) => void,
+    signal: AbortSignal, outputSize: number, onProgress?: (progress: GenerationProgress) => void,
 ): Promise<GenerateResponse> {
     const started = performance.now();
     const { Client, handle_file } = await import('@gradio/client');
-    const prepared = await prepareImage(file, signal);
+    const prepared = await prepareImage(file, signal, outputSize);
     const errors: string[] = [];
     const actualSeed = seed === -1 ? crypto.getRandomValues(new Uint32Array(1))[0] % 2147483647 : seed;
     for (const [index, space] of SPACES.entries()) {
@@ -116,6 +117,7 @@ export const generateImage = async (
     guidance_scale: number, seed: number, prompt: string, hfToken?: string,
     options: GenerationOptions = {},
 ): Promise<GenerateResponse> => {
+    const outputSize = GENERATION_SIZES[options.quality ?? 'balanced'];
     const backendUrl = ((import.meta.env.VITE_BACKEND_URL as string | undefined) ?? 'http://127.0.0.1:8000').replace(/\/+$/, '');
     const controller = new AbortController();
     const abort = () => controller.abort(options.signal?.reason);
@@ -142,6 +144,7 @@ export const generateImage = async (
             if (health.generation_api !== 'jobs-v1') throw new Error('Restart the Oraa AI backend to load the image generation fix.');
             const form = new FormData();
             form.append('file', file);
+            form.append('output_size', String(outputSize));
             for (const [key, value] of Object.entries({ yaw, pitch, distance, steps, guidance_scale, seed, prompt })) form.append(key, String(value));
             if (hfToken?.trim()) form.append('hf_token', hfToken.trim());
             const job = await requestJson<GenerationJob>(`${backendUrl}/generations`, { method: 'POST', body: form }, controller.signal);
@@ -151,7 +154,7 @@ export const generateImage = async (
             return result;
         }
         const result = await generateDirect(file, yaw, pitch, distance, steps, guidance_scale, seed, prompt,
-            hfToken, controller.signal, options.onProgress);
+            hfToken, controller.signal, outputSize, options.onProgress);
         finished = true;
         return result;
     } catch (error) {

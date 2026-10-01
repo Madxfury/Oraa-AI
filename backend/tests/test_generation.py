@@ -177,6 +177,33 @@ class GenerationTests(unittest.IsolatedAsyncioTestCase):
             await main._generate(image_bytes(), 45, 0, 1.4, 4, 1, 42, '', None, lambda _: None)
         self.assertEqual(provider.call_args.args[1]['distance'], 1.8)
 
+    async def test_fast_preview_reduces_gpu_dimensions_and_has_a_separate_cache_entry(self):
+        provider = AsyncMock(return_value=result())
+        raw = image_bytes(640, 640)
+        with patch.object(main, 'call_hf_space', provider):
+            fast = await main._generate(raw, 45, 0, 1, 4, 1, 42, '', None, lambda _: None, output_size=384)
+            balanced = await main._generate(raw, 45, 0, 1, 4, 1, 42, '', None, lambda _: None, output_size=512)
+        self.assertEqual(provider.await_count, 2)
+        self.assertEqual(fast['metadata']['resolution'], '384x384')
+        self.assertEqual(balanced['metadata']['resolution'], '512x512')
+        self.assertEqual(provider.await_args_list[0].args[1]['num_inference_steps'], 4)
+        self.assertEqual(provider.await_args_list[0].args[1]['width'], 384)
+
+    async def test_job_and_legacy_endpoints_accept_valid_preview_sizes(self):
+        provider = AsyncMock(return_value=result())
+        with patch.object(main, 'call_hf_space', provider):
+            response = await self.client.post('/generations', files={'file': ('input.png', image_bytes(640, 640), 'image/png')}, data={'output_size': '384', 'seed': '42'})
+            self.assertEqual(response.status_code, 202)
+            job_id = response.json()['id']
+            await main._tasks[job_id]
+            self.assertEqual(main._jobs[job_id]['result']['metadata']['resolution'], '384x384')
+            response = await self.client.post('/generate', files={'file': ('input.png', image_bytes(640, 640), 'image/png')}, data={'output_size': '384', 'seed': '42'})
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.json()['metadata']['resolution'], '384x384')
+        for size in ['128', '385', '2048']:
+            response = await self.client.post('/generations', files={'file': ('input.png', image_bytes(), 'image/png')}, data={'output_size': size})
+            self.assertEqual(response.status_code, 422)
+
     async def test_paid_provider_requires_explicit_selection(self):
         paid = AsyncMock(return_value=result())
         with patch.dict(main.os.environ, {'FAL_KEY': 'test-only-key'}), patch.object(main, 'call_fal', paid), patch.object(main, 'call_hf_space', AsyncMock(return_value=result())):

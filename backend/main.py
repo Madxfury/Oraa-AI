@@ -103,9 +103,9 @@ def prepare_image_bytes(raw: bytes) -> bytes:
         return output.getvalue()
 
 
-def _output_dimensions(image_bytes: bytes) -> tuple[int, int]:
+def _output_dimensions(image_bytes: bytes, output_size: Optional[int] = None) -> tuple[int, int]:
     with Image.open(io.BytesIO(image_bytes)) as image:
-        scale = OUTPUT_SIZE / max(image.size)
+        scale = (output_size if output_size is not None else OUTPUT_SIZE) / max(image.size)
         return tuple(max(256, round(side * scale / 16) * 16) for side in image.size)
 
 
@@ -230,10 +230,11 @@ async def call_hf_space(image_bytes: bytes, parameters: dict, hf_space: str,
 
 async def _generate(raw: bytes, yaw: float, pitch: float, distance: float,
                     steps: int, guidance_scale: float, seed: int, prompt: str,
-                    hf_token: Optional[str], on_progress: Callable[[dict], None]) -> dict:
+                    hf_token: Optional[str], on_progress: Callable[[dict], None],
+                    output_size: Optional[int] = None) -> dict:
     started = time.monotonic()
     image_bytes = prepare_image_bytes(raw)
-    width, height = _output_dimensions(image_bytes)
+    width, height = _output_dimensions(image_bytes, output_size)
     provider = os.getenv('IMAGE_PROVIDER', 'huggingface').strip().lower()
     if provider not in {'huggingface', 'fal'}:
         raise HTTPException(503, 'IMAGE_PROVIDER must be huggingface or fal in backend/.env.')
@@ -362,6 +363,7 @@ async def create_generation(
     guidance_scale: float = Form(GUIDANCE_SCALE, ge=1, le=10),
     seed: int = Form(-1, ge=-1, le=2147483647), prompt: str = Form(''),
     hf_token: Optional[str] = Form(None),
+    output_size: Optional[int] = Form(None, ge=256, le=1024, multiple_of=16),
 ):
     _prune_jobs()
     if len(_tasks) >= MAX_ACTIVE_JOBS:
@@ -375,6 +377,7 @@ async def create_generation(
     _tasks[job_id] = asyncio.create_task(_run_job(
         job_id, raw=raw, yaw=yaw, pitch=pitch, distance=distance, steps=steps,
         guidance_scale=guidance_scale, seed=seed, prompt=prompt, hf_token=hf_token,
+        output_size=output_size,
     ))
     return _job_response(job_id)
 
@@ -407,12 +410,13 @@ async def generate_image(
     guidance_scale: float = Form(GUIDANCE_SCALE, ge=1, le=10),
     seed: int = Form(-1, ge=-1, le=2147483647), prompt: str = Form(''),
     hf_token: Optional[str] = Form(None),
+    output_size: Optional[int] = Form(None, ge=256, le=1024, multiple_of=16),
 ):
     raw = await _read_image(file)
     try:
         return await asyncio.wait_for(_generate(
             raw, yaw, pitch, distance, steps, guidance_scale, seed, prompt,
-            hf_token, lambda _progress: None,
+            hf_token, lambda _progress: None, output_size=output_size,
         ), timeout=GENERATION_TIMEOUT_S)
     except (TimeoutError, asyncio.TimeoutError):
         raise HTTPException(504, 'Image generation timed out. Please try again later.')
