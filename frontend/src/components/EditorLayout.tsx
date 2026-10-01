@@ -3,9 +3,8 @@ import { Loader2, Square, Zap, Sparkles } from 'lucide-react';
 import { Camera3DControl } from './Camera3DControl';
 import { SlidersConfiguration } from './SlidersConfiguration';
 import { InputImagePanel, OutputImagePanel } from './ImagePreviewPanels';
-import { PromptGenerator, generatePromptText } from './PromptGenerator';
-import { generateImage } from '../api';
-import type { GenerationProgress, GenerationQuality } from '../api';
+import { generatePreview, resetPreview } from '../preview/client';
+import type { GenerationProgress, GenerationQuality } from '../generation';
 export function EditorLayout() {
     const [isGenerating, setIsGenerating] = useState(false);
     const [inputFile, setInputFile] = useState<File | null>(null);
@@ -16,13 +15,13 @@ export function EditorLayout() {
     const [quality, setQuality] = useState<GenerationQuality>('fast');
     const activeRequest = useRef<AbortController | null>(null);
 
-    useEffect(() => () => activeRequest.current?.abort(), []);
+    useEffect(() => () => { activeRequest.current?.abort(); resetPreview(); }, []);
 
     // Core parameters state
     const [azimuthDeg, setAzimuthDeg] = useState(0);
     const [elevationDeg, setElevationDeg] = useState(0);
     const [distanceVal, setDistanceVal] = useState(1.0);
-    const [hfToken, setHfToken] = useState("");
+    const [outputNotice, setOutputNotice] = useState<string | null>(null);
 
     const handleGenerate = async () => {
         if (activeRequest.current) return;
@@ -36,31 +35,20 @@ export function EditorLayout() {
         setIsGenerating(true);
         setErrorMsg(null);
         setOutputUrl(null);
-        const prompt = generatePromptText(azimuthDeg, elevationDeg, distanceVal);
+        setOutputNotice(null);
 
         try {
-            const response = await generateImage(
-                inputFile,
-                azimuthDeg,
-                elevationDeg,
-                distanceVal,
-                4,
-                1.0,
-                -1,
-                prompt,
-                hfToken,
-                { signal: controller.signal, onProgress: setProgress, quality }
-            );
-
-            if (response.image_base64) {
-                setOutputUrl(response.image_base64);
-            }
+            const response = await generatePreview(inputFile, {
+                yaw: azimuthDeg, pitch: elevationDeg, distance: distanceVal,
+            }, { signal: controller.signal, onProgress: setProgress, quality });
+            setOutputUrl(response.imageUrl);
+            setOutputNotice(response.notice);
         } catch (error: unknown) {
             if (error instanceof DOMException && error.name === 'AbortError') return;
-            console.error("Failed to generate image:", error);
+            console.error("Failed to create preview:", error);
             const err = error as { response?: { data?: { detail?: string } }; message?: string };
-            const backendError = err.response?.data?.detail || err.message || "Generation failed. Please try again.";
-            setErrorMsg(backendError);
+            const previewError = err.response?.data?.detail || err.message || "Could not create the preview. Please try again.";
+            setErrorMsg(previewError);
         } finally {
             activeRequest.current = null;
             setProgress(null);
@@ -78,28 +66,19 @@ export function EditorLayout() {
                     <button onClick={() => setErrorMsg(null)} className="text-red-400/60 hover:text-red-300 text-lg leading-none ml-2">✕</button>
                 </div>
             )}
-            {/* Top Toolbar (HF Token & Generate) */}
+            {/* Preview toolbar */}
             <div className="flex flex-col w-full max-w-[800px] mx-auto mb-4 gap-3 px-4">
                 <div className="flex flex-col sm:flex-row items-end gap-3 sm:gap-4">
-                    <div className="w-full sm:flex-1 min-w-0 flex flex-col gap-1.5 pt-2">
-                        <label className="text-[10px] sm:text-[11px] font-medium text-zinc-400 tracking-wide text-left ml-2">
-                            Hugging Face Token <span className="text-emerald-500 text-[10px]">(optional — use your account's GPU quota)</span>
-                        </label>
-                        <input
-                            type="password"
-                            autoComplete="off"
-                            placeholder="Paste your Hugging Face Token (hf_...) [optional]"
-                            value={hfToken}
-                            onChange={(e) => setHfToken(e.target.value)}
-                            className="w-full bg-[#111] border border-white/5 rounded-2xl px-4 sm:px-5 py-3 sm:py-3.5 text-sm text-zinc-300 placeholder:text-zinc-600 focus:outline-none focus:border-indigo-500/50 transition-all font-mono shadow-inner"
-                        />
+                    <div className="w-full sm:flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-emerald-300">Private browser previews</p>
+                        <p className="mt-1 text-xs leading-relaxed text-zinc-400">No API key or GPU queue. Your image stays on your device.</p>
                     </div>
                     <div className="w-full sm:w-[240px] shrink-0 h-[52px]">
                     {isGenerating ? (
                         <div className="h-full flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/[0.04] pl-4 pr-1.5">
                             <span role="status" className="flex min-w-0 items-center gap-2 text-xs font-medium text-zinc-300">
                                 <Loader2 aria-hidden="true" className="w-4 h-4 shrink-0 animate-spin text-emerald-400" />
-                                Generating
+                                Processing
                             </span>
                             <button
                                 type="button"
@@ -117,7 +96,7 @@ export function EditorLayout() {
                             onClick={handleGenerate}
                             className="w-full h-full rounded-2xl font-bold text-[15px] bg-white text-black shadow-lg shadow-white/10 transition-all flex items-center justify-center gap-2 hover:bg-zinc-200 active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950"
                         >
-                            Generate Angle
+                            Create Preview
                         </button>
                     )}
                     </div>
@@ -139,17 +118,28 @@ export function EditorLayout() {
                         ))}
                     </div>
                     <p className="text-[11px] leading-relaxed text-zinc-500">
-                        {quality === 'fast' ? 'Smaller previews for quicker angle experiments.' : 'More detail for your final image.'}
+                        {quality === 'fast' ? 'Smaller previews; depth is reused for later angles.' : 'More detail in your perspective preview.'}
                     </p>
                 </div>
             </div>
+
+            <p className="max-w-[800px] mx-auto px-4 text-xs leading-relaxed text-zinc-400">
+                Small perspective shifts only: ±15° horizontal and ±10° vertical. This reprojects visible pixels;
+                it cannot generate unseen sides or back views. First use downloads a free depth model.
+            </p>
 
             {/* 2x2 Layout Grid */}
             <div className="flex flex-col lg:flex-row gap-6 w-full">
                 {/* Left Column (Input & 3D Camera) */}
                 <div className="w-full lg:w-5/12 flex flex-col gap-6">
                     <InputImagePanel
-                        setInputFile={setInputFile}
+                        setInputFile={value => {
+                            activeRequest.current?.abort(new DOMException('Image changed.', 'AbortError'));
+                            resetPreview();
+                            setInputFile(value);
+                            setOutputUrl(null);
+                            setOutputNotice(null);
+                        }}
                         inputSrc={inputSrc}
                         setInputSrc={setInputSrc}
                     />
@@ -188,6 +178,7 @@ export function EditorLayout() {
                         isGenerating={isGenerating}
                         outputUrl={outputUrl}
                         generationMessage={progress?.message}
+                        outputNotice={outputNotice}
                     />
 
                     <div className="bg-[#09090b] border border-white/5 rounded-2xl overflow-hidden flex flex-col relative flex-1 p-4 sm:p-6 pt-14 sm:pt-16">
@@ -208,14 +199,12 @@ export function EditorLayout() {
                             <div className="mt-6 sm:mt-8 pt-4 sm:pt-6 border-t border-white/5">
                                 <div className="flex items-center gap-2 mb-4">
                                     <div className="text-[11px] font-medium text-zinc-400 uppercase tracking-wide">
-                                        Active Prompt Parameter
+                                        Preview Camera
                                     </div>
                                 </div>
-                                <PromptGenerator
-                                    azimuthDeg={azimuthDeg}
-                                    elevationDeg={elevationDeg}
-                                    distanceVal={distanceVal}
-                                />
+                                <p className="font-mono text-xs text-zinc-300 bg-white/5 rounded-lg p-4">
+                                    Horizontal {azimuthDeg.toFixed(0)}° · Vertical {elevationDeg.toFixed(0)}° · Distance {distanceVal.toFixed(2)}
+                                </p>
                             </div>
                         </div>
                     </div>

@@ -98,21 +98,18 @@ function Scene({ azimuthDeg, setAzimuthDeg, elevationDeg, setElevationDeg, dista
             // sin(az + PI/4) for dx, and cos(az + PI/4) for dy (approx 1/3 weight).
             const az = (prev * Math.PI) / 180;
             const dAngle = dx * Math.sin(az + Math.PI / 4) + dy * 0.33 * Math.cos(az + Math.PI / 4);
-            let newVal = prev + dAngle * 0.6;
-            if (newVal < 0) newVal = (newVal % 360) + 360;
-            if (newVal >= 360) newVal %= 360;
-            return newVal;
+            return Math.max(-15, Math.min(15, prev + dAngle * 0.6));
         });
     });
 
     const bindPink = useDrag(({ delta: [, dy], event }) => {
         event.stopPropagation();
-        setElevationDeg((p: number) => Math.max(-30, Math.min(60, p - dy * 0.5)));
+        setElevationDeg((p: number) => Math.max(-10, Math.min(10, p - dy * 0.5)));
     });
 
     const bindYellow = useDrag(({ delta: [dx, dy], event }) => {
         event.stopPropagation();
-        setDistanceVal((dist: number) => Math.max(0.6, Math.min(1.4, dist - (dx + dy) * 0.005)));
+        setDistanceVal((dist: number) => Math.max(0.85, Math.min(1.15, dist - (dx + dy) * 0.005)));
     });
 
     const camPos = new THREE.Vector3(
@@ -131,7 +128,7 @@ function Scene({ azimuthDeg, setAzimuthDeg, elevationDeg, setElevationDeg, dista
     const arcPoints = useMemo(() => {
         const points = [];
         for (let i = 0; i <= 32; i++) {
-            const angle = THREE.MathUtils.degToRad(-30 + (90 * i / 32));
+            const angle = THREE.MathUtils.degToRad(-10 + (20 * i / 32));
             points.push(new THREE.Vector3(-0.8, elevationRadius * Math.sin(angle), elevationRadius * Math.cos(angle)));
         }
         return points;

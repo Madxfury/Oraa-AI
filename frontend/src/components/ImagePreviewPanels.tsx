@@ -261,9 +261,10 @@ export interface OutputImagePanelProps {
     isGenerating: boolean;
     outputUrl: string | null;
     generationMessage?: string;
+    outputNotice?: string | null;
 }
 
-export function OutputImagePanel({ isGenerating, outputUrl, generationMessage }: OutputImagePanelProps) {
+export function OutputImagePanel({ isGenerating, outputUrl, generationMessage, outputNotice }: OutputImagePanelProps) {
     const [elapsedSeconds, setElapsedSeconds] = useState(0);
     const [loadedUrl, setLoadedUrl] = useState<string | null>(null);
     const [failedUrl, setFailedUrl] = useState<string | null>(null);
@@ -290,7 +291,7 @@ export function OutputImagePanel({ isGenerating, outputUrl, generationMessage }:
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `oraa-output-${Date.now()}.jpg`;
+            a.download = `oraa-perspective-preview-${Date.now()}.png`;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
@@ -326,7 +327,7 @@ export function OutputImagePanel({ isGenerating, outputUrl, generationMessage }:
             <div className="bg-[#09090b] border border-white/5 rounded-2xl overflow-hidden flex flex-col group relative h-[300px] md:h-[400px]">
                 <div className="absolute top-5 left-5 z-10 transition-opacity">
                     <div className="bg-transparent border border-white/10 rounded-full text-zinc-400 text-[10px] font-medium uppercase tracking-widest px-3 py-1.5 flex items-center">
-                        OUTPUT RESULT
+                        PERSPECTIVE PREVIEW
                     </div>
                 </div>
 
@@ -357,7 +358,7 @@ export function OutputImagePanel({ isGenerating, outputUrl, generationMessage }:
                     {outputUrl && outputUrl !== failedUrl && (
                         <img
                             src={outputUrl}
-                            alt="Generated output"
+                            alt="Perspective preview"
                             className={`w-full h-full object-contain drop-shadow-2xl transition-all duration-700 ${showLoadingState ? 'opacity-0 absolute hidden' : 'opacity-100'}`}
                             onLoad={() => setLoadedUrl(outputUrl)}
                             onError={() => setFailedUrl(outputUrl)}
@@ -369,21 +370,24 @@ export function OutputImagePanel({ isGenerating, outputUrl, generationMessage }:
                             <div className="w-10 h-10 rounded-full bg-zinc-900 border border-white/5 flex items-center justify-center">
                                 <span className="text-[15px]">✧</span>
                             </div>
-                            <span className="text-[13px] font-medium text-zinc-500">Awaiting generation</span>
+                            <span className="text-[13px] font-medium text-zinc-500">Awaiting preview</span>
                         </div>
                     )}
 
                     {outputUrl && outputUrl === failedUrl && !isGenerating && (
                         <p role="alert" className="text-sm text-red-300 text-center">
-                            The generated image could not be displayed. Please generate it again.
+                            The preview could not be displayed. Please create it again.
                         </p>
                     )}
 
                     {showLoadingState && (
                         <ProcessingAnimation elapsedSeconds={elapsedSeconds}
-                            message={isGenerating ? generationMessage || 'Waiting for image generation…' : 'Loading your image…'} />
+                            message={isGenerating ? generationMessage || 'Preparing your perspective preview…' : 'Loading your image…'} />
                     )}
                 </div>
+                {outputNotice && !showLoadingState && (
+                    <p role="status" className="px-5 py-3 border-t border-white/5 text-[11px] leading-relaxed text-zinc-400">{outputNotice}</p>
+                )}
             </div>
         </>
     );

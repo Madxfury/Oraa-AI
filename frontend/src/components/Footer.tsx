@@ -15,12 +15,12 @@ export function Footer() {
                         <span>Oraa <span className="text-emerald-400 ml-0.5">AI</span></span>
                     </div>
                     <p className="text-white/50 text-sm max-w-md mx-auto">
-                        Advanced Camera Angle Control using LoRA-based image editing. Built for research & demonstration purposes.
+                        Private depth-based perspective previews, powered by open-source models in your browser.
                     </p>
                 </motion.div>
 
                 <div className="flex gap-6 mb-8 text-sm text-white/40">
-                    <a href="#" className="hover:text-white transition-colors">Documentation</a>
+                    <a href="https://github.com/Madxfury/Oraa-AI#readme" className="hover:text-white transition-colors">Documentation</a>
                     <a href="https://github.com/Madxfury/Oraa-AI" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">GitHub Repository</a>
                 </div>
 

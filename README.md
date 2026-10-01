@@ -1,160 +1,73 @@
-# ˖°📸 ༘ Oraa AI
+# Oraa AI
 
-<p align="center">
-  <img src="frontend/public/logo.png" alt="Oraa AI Logo" width="120" />
-</p>
+<p align="center"><img src="frontend/public/logo.png" alt="Oraa AI" width="120" /></p>
 
-<p align="center">
-  <strong>Advanced Camera Angle Control using LoRA-based image editing.</strong>
-</p>
+**Private, keyless perspective previews in your browser.** Upload a photo, adjust a small camera shift, and export a PNG. The default app runs entirely on the visitor's device. It needs no Hugging Face account, API key, Python server, or paid inference endpoint.
 
-<p align="center">
-  <a href="https://github.com/Madxfury/Oraa-AI/blob/main/LICENSE"><img src="https://img.shields.io/github/license/Madxfury/Oraa-AI?style=flat-square&color=emerald" alt="License"></a>
-  <a href="https://github.com/Madxfury/Oraa-AI/stargazers"><img src="https://img.shields.io/github/stars/Madxfury/Oraa-AI?style=flat-square&color=emerald" alt="Stars"></a>
-  <a href="https://github.com/Madxfury/Oraa-AI/network/members"><img src="https://img.shields.io/github/forks/Madxfury/Oraa-AI?style=flat-square&color=emerald" alt="Forks"></a>
-</p>
+## What a preview can do
 
----
+The free [Depth Anything V2 Small](https://github.com/DepthAnything/Depth-Anything-V2) model estimates relative depth. Oraa reprojects the original visible pixels with a depth buffer. It supports horizontal shifts of **−15° to +15°**, vertical shifts of **−10° to +10°**, and camera distance **0.85–1.15**.
 
-Oraa AI is an interactive web-based playground for **Qwen-Image-Edit (Icedit LoRA)**. It provides a real-time, interactive 3D camera controller that enables users to manipulate and change the camera perspective (azimuth, elevation, and distance) of any input image. 
+This is a **depth-based perspective preview**, not generative image editing or a complete 3D reconstruction. It cannot invent a subject's unseen sides, produce back views, or recover occluded detail. Uncovered areas remain transparent in the exported PNG. Depth estimates can be imperfect, especially around thin objects and sharp boundaries.
 
-<img width="1260" height="627" alt="2026-07-08_19-46-21" src="https://github.com/user-attachments/assets/57f07f28-263b-4926-b3be-53de6d8b05f9" />
+## Run locally
 
-The application translates intuitive 3D spatial rotations directly into prompt parameters for LoRA-based image transformation, giving you a physical, tactile way to control image editing.
+Use Node.js 22 LTS (Vite requires at least Node 20.19 or 22.12).
 
-## ✨ Features
-
-- **🎮 Interactive 3D Viewport:** A real-time Three.js / React Three Fiber interactive viewport. Drag handles (🟢 Azimuth, 🩷 Elevation, 🟠 Distance) to orient your virtual camera.
-- **🔄 Auto Prompt Synthesis:** Automatically translates the physical angles from the 3D model into precise prompts (`<sks> front-left quarter view eye-level shot close-up`) for the LoRA edit space.
-- **⚡ Dual Mode Integration:** Call the Python FastAPI backend wrapper or run direct Gradio client connections to the Hugging Face Space.
-- **🎨 Premium Dark UI:** Smooth entrance transitions, custom glassmorphic panels, custom scroll animations, and clean, responsive elements.
-- **🛡️ Secure Configs:** Fully set up with environment variable configurations to prevent key leaks on public repositories.
-
----
-
-## 🛠️ Tech Stack
-
-### Frontend
-- **Framework:** React 19 + TypeScript + Vite
-- **Styling:** TailwindCSS + Vanilla CSS
-- **Animations:** Framer Motion
-- **3D Graphics:** Three.js + React Three Fiber (R3F) + Drei
-
-### Backend
-- **Framework:** FastAPI (Python 3.10+)
-- **Networking:** HTTPX + Gradio Client
-- **Image Processing:** Pillow (PIL)
-- **Secrets:** python-dotenv
-
----
-
-## 🚀 Getting Started
-
-### Prerequisites
-- [Node.js](https://nodejs.org/) (v18+)
-- [Python](https://www.python.org/) (3.10+)
-- A [Hugging Face User Access Token](https://huggingface.co/settings/tokens)
-
----
-
-### 1. Backend Setup
-
-1. Navigate to the backend directory:
-   ```bash
-   cd backend
-   ```
-2. Create and activate a virtual environment:
-   ```bash
-   python3 -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
-   ```
-3. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
-4. Configure environment variables. Copy the example `.env` file and enter your Hugging Face Token:
-   ```bash
-   cp .env.example .env
-   ```
-   Edit `.env`:
-   ```env
-   HF_TOKEN=your_huggingface_token_here
-   ```
-5. Run the FastAPI development server (use one worker for the in-memory job queue):
-   ```bash
-   uvicorn main:app --reload --port 8000
-   ```
-
----
-
-### 2. Frontend Setup
-
-1. Navigate to the frontend directory:
-   ```bash
-   cd ../frontend
-   ```
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
-3. Run the Vite development server:
-   ```bash
-   npm run dev
-   ```
-4. Open your browser and navigate to `http://localhost:5173/`.
-
----
-
-## Image generation reliability
-
-The editor submits a background job and polls its status, so GPU queue waits do not hold a single browser request open. It shows the real queue state, supports cancellation, and tries each configured Hugging Face Space once. Each Space has an 80-second deadline; the complete backend job has a 180-second limit. Browser requests have a 200-second overall limit. Cancellation removes queued jobs where the upstream service supports it; inference already running on a GPU can continue remotely.
-
-The editor defaults to **Fast** previews (384px maximum output side); choose **Balanced** (512px) for more detail. A square 384px preview has about 44% fewer pixels than a 512px image, reducing generation work without changing the four-step Lightning adapter settings. Actual latency still depends on GPU availability and queue time. Both modes work through the backend, browser-only Hugging Face fallback, and optional fal provider.
-
-The free Hugging Face path uses four steps and guidance 1.0. The backend accepts an optional `output_size` form field (256–1024, multiples of 16); requests without it use `IMAGE_OUTPUT_SIZE` (default 512). Output width and height follow the input aspect ratio, with a 256px minimum side. Generated images are downloaded before success is reported. Invalid uploads are rejected instead of being sent to a GPU.
-
-Hugging Face ZeroGPU is a shared, quota-limited service. A token uses that account's quota; creating several tokens for the same account does not add GPU time. The UI reports exhausted quota and unavailable GPUs as terminal errors. Set `HF_SPACE` or `HF_SPACES` to use a deployment you control.
-
-For a dedicated paid alternative, the backend supports [fal's Qwen camera-angle API](https://fal.ai/models/fal-ai/qwen-image-edit-2511-multiple-angles/api). Enable it explicitly in `backend/.env`:
-
-```env
-IMAGE_PROVIDER=fal
-FAL_KEY=your_fal_api_key
+```sh
+npm ci --prefix frontend
+npm run dev
 ```
 
-Restart the backend after changing configuration. This path uses fal's regular-model settings (28 steps, guidance 4.5), maps Oraa's camera distance to fal's zoom scale, and retains the same job status and Cancel controls. It requires API credits. Keep `FAL_KEY` in the backend; never put it in a `VITE_*` environment variable. The default `IMAGE_PROVIDER=huggingface` makes no paid API calls.
+Open the URL printed by Vite. Choose an image, adjust the camera, and click **Create Preview**. Fast uses up to 384px; Balanced uses up to 512px. Both preserve aspect ratio without enlarging small uploads. Depth is reused for subsequent camera changes on the same image at the same resolution.
 
-Regression checks:
+First use downloads the public quantized model from Hugging Face and loads a bundled WASM runtime. Model files are cached through the browser Cache API when available. Later visits may require a download again if the browser evicts its cache. Internet access is needed for that initial download, but **no inference API is called and no image is uploaded**. This avoids the shared ZeroGPU quota entirely.
 
-```bash
-cd backend
-./venv/bin/python -m unittest discover -s tests -v
-cd ../frontend
+Inference uses single-threaded ONNX WASM in a Web Worker, so it does not require WebGPU or cross-origin isolation headers. **Cancel** terminates the worker. If the model cannot load, the worker fails, or depth processing exceeds 90 seconds, Oraa returns a clearly labelled **basic perspective preview** using a flat surface. This fallback has no AI depth and does not invent hidden details. Reload the page to retry model loading after a network failure. Invalid or oversized uploads still produce a useful validation message.
+
+## Deploy on Vercel
+
+1. Import [Madxfury/Oraa-AI](https://github.com/Madxfury/Oraa-AI).
+2. Leave **Root Directory** at the repository root. The root `vercel.json` configures installation, build, static output, and SPA routing.
+3. Use Node.js 22 and deploy. **No environment variables or backend deployment are needed.**
+
+Alternatively, set Root Directory to `frontend`; its existing `vercel.json` supports that layout too. Remove old `VITE_BACKEND_URL` configuration: the default editor no longer calls a backend. Vercel serves static assets; the visitor's browser performs the computation. Initial download and inference speed depend on the visitor's connection and device.
+
+Verify locally with the same static output:
+
+```sh
+npm run build
+npm run preview
+```
+
+## Architecture and licenses
+
+- React 19, TypeScript, Vite, Tailwind, Three.js / React Three Fiber.
+- [`@huggingface/transformers`](https://github.com/huggingface/transformers.js) 3.8.1 (Apache-2.0) and ONNX Runtime Web (MIT).
+- [`onnx-community/depth-anything-v2-small`](https://huggingface.co/onnx-community/depth-anything-v2-small), public quantized ONNX weights (Apache-2.0).
+- Local image preparation, depth caching, reprojection with occlusion handling, transparent PNG export, and cancellable workers.
+
+The library and WASM worker are bundled into the static build. Model weights are downloaded as public files, which is different from using a hosted inference API. Hugging Face file hosting can still be unavailable; the basic preview keeps the app usable in that case. The app does not promise that every browser, network, or malformed image is error-free.
+
+## Checks
+
+```sh
+cd frontend
 npm test
 npm run lint
 npm run build
 ```
 
-Job results are kept in memory for ten minutes and up to twenty completed jobs. Restarting the backend clears them. Multiple backend workers would need a shared queue and result store.
+Tests cover reprojection, transparent unknown regions, camera limits, model failure, depth reuse, cancellation, and upload validation. The older GPU adapter regression tests are retained separately.
 
-## 🤝 Contributing
+## Legacy GPU backend
 
-Contributions are what make the open source community such an amazing place to learn, inspire, and create. Any contributions you make are **greatly appreciated**.
+The `backend/`, `frontend/src/api.ts`, and Gradio helpers are retained for developers who need the previous generative Qwen workflow. They are **not used by the default browser editor**. That workflow depends on externally hosted GPUs, tokens or provider credentials, and service quotas; it cannot supply unlimited free generative inference on a static Vercel deployment.
 
-1. Fork the Project
-2. Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your Changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the Branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
+For that optional backend, install `backend/requirements.txt`, copy `backend/.env.example` to `backend/.env`, configure the provider, and run `uvicorn main:app --port 8000` with one worker. The in-memory job queue is unsuitable for stateless Vercel Functions. Do not expose provider keys through `VITE_*` variables.
 
----
+## Why the quota error needed a different approach
 
-## 📄 License
+[Hugging Face ZeroGPU](https://huggingface.co/docs/hub/spaces-zerogpu) imposes daily GPU quotas. Removing a token or switching between public Spaces does not guarantee available inference. [Vercel supports the application layer rather than native GPU execution](https://vercel.com/i/what-is-serverless-gpu). Open-source weights do not include free unlimited GPU compute. Browser previews meet the free, keyless, static-hosting requirements by changing the feature to bounded image reprojection with explicit limits.
 
-Distributed under the MIT License. See `LICENSE` for more information.
-
----
-
-<p align="center">
-  Build with ❤️‍🔥 by <a href="https://github.com/Madxfury">Sanskar</a>
-</p>
+Oraa source is MIT licensed; third-party models and libraries retain their own licenses.

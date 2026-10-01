@@ -58,21 +58,22 @@ export function SlidersConfiguration({
                             <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.5)]"></span>
                             <span className="text-zinc-200 text-[10px] sm:text-[11px] font-medium uppercase tracking-widest truncate">Azimuth (Horizontal)</span>
                         </div>
-                        <p className="text-zinc-500 text-[9px] sm:text-[10px] font-medium tracking-wide pb-1 truncate">0°=FRONT, 90°=RIGHT, 180°=BACK, 270°=LEFT</p>
+                        <p className="text-zinc-500 text-[9px] sm:text-[10px] font-medium tracking-wide pb-1 truncate">SMALL SHIFTS: −15° LEFT TO +15° RIGHT</p>
                     </div>
 
                     <div className="flex bg-black/40 border border-white/5 rounded-lg overflow-hidden backdrop-blur-md">
                         <input
                             type="number"
                             className="w-14 bg-transparent text-zinc-300 text-xs font-mono text-center outline-none py-1.5"
+                            aria-label="Horizontal angle"
                             value={Math.round(azimuthDeg)}
-                            onChange={(e) => setAzimuthDeg(Math.min(315, Math.max(0, Number(e.target.value))))}
-                            min="0" max="315"
+                            onChange={(e) => setAzimuthDeg(Math.min(15, Math.max(-15, Number(e.target.value))))}
+                            min="-15" max="15"
                         />
                         <button
                             className="bg-white/5 px-2 hover:bg-white/10 transition-colors border-l border-white/5 text-zinc-500 hover:text-zinc-300 text-xs"
-                            onClick={() => setAzimuthDeg(90)}
-                            title="Reset to Right Side"
+                            onClick={() => setAzimuthDeg(0)}
+                            title="Reset horizontal angle"
                         >
                             ↺
                         </button>
@@ -80,22 +81,23 @@ export function SlidersConfiguration({
                 </div>
 
                 <div className="flex items-center gap-4 w-full px-1">
-                    <span className="text-[10px] font-medium text-zinc-600 w-4">0</span>
+                    <span className="text-[10px] font-medium text-zinc-600 w-4">-15</span>
                     <div className="relative flex-1 flex items-center h-6">
                         {/* Custom Track Fill */}
                         <div
                             className="absolute left-0 h-1 bg-emerald-400 rounded-l pointer-events-none z-0"
-                            style={{ width: `${Math.min(100, Math.max(0, (azimuthDeg / 315) * 100))}%` }}
+                            style={{ width: `${Math.min(100, Math.max(0, ((azimuthDeg + 15) / 30) * 100))}%` }}
                         />
                         <input
                             type="range"
-                            min="0" max="315" step="1"
+                            min="-15" max="15" step="1"
+                            aria-label="Horizontal angle slider"
                             value={azimuthDeg}
                             onChange={(e) => setAzimuthDeg(Number(e.target.value))}
                             className="absolute inset-0 w-full z-10 m-0"
                         />
                     </div>
-                    <span className="text-[10px] font-medium text-zinc-600 w-6">315</span>
+                    <span className="text-[10px] font-medium text-zinc-600 w-6">15</span>
                 </div>
             </div>
 
@@ -107,16 +109,17 @@ export function SlidersConfiguration({
                             <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full shadow-[0_0_8px_rgba(236,72,153,0.5)]" style={{ background: '#ff69b4' }}></span>
                             <span className="text-zinc-200 text-[10px] sm:text-[11px] font-medium uppercase tracking-widest truncate">Elevation (Vertical)</span>
                         </div>
-                        <p className="text-zinc-500 text-[9px] sm:text-[10px] font-medium tracking-wide pb-1 truncate">-30°=LOW ANGLE, 0°=EYE LEVEL, 60°=HIGH ANGLE</p>
+                        <p className="text-zinc-500 text-[9px] sm:text-[10px] font-medium tracking-wide pb-1 truncate">SMALL SHIFTS: −10° TO +10°</p>
                     </div>
 
                     <div className="flex bg-black/40 border border-white/5 rounded-lg overflow-hidden backdrop-blur-md">
                         <input
                             type="number"
                             className="w-14 bg-transparent text-zinc-300 text-xs font-mono text-center outline-none py-1.5"
+                            aria-label="Vertical angle"
                             value={Math.round(elevationDeg)}
-                            onChange={(e) => setElevationDeg(Math.min(60, Math.max(-30, Number(e.target.value))))}
-                            min="-30" max="60"
+                            onChange={(e) => setElevationDeg(Math.min(10, Math.max(-10, Number(e.target.value))))}
+                            min="-10" max="10"
                         />
                         <button
                             className="bg-white/5 px-2 hover:bg-white/10 transition-colors border-l border-white/5 text-zinc-500 hover:text-zinc-300 text-xs"
@@ -129,21 +132,22 @@ export function SlidersConfiguration({
                 </div>
 
                 <div className="flex items-center gap-4 w-full px-1">
-                    <span className="text-[10px] font-medium text-zinc-600 w-4">-30</span>
+                    <span className="text-[10px] font-medium text-zinc-600 w-4">-10</span>
                     <div className="relative flex-1 flex items-center h-6">
                         {/* Custom Track Fill */}
                         <div
-                            className="absolute left-0 h-1 rounded-l pointer-events-none z-0" style={{ background: '#ff69b4', width: `${((elevationDeg + 30) / 90) * 100}%` }}
+                            className="absolute left-0 h-1 rounded-l pointer-events-none z-0" style={{ background: '#ff69b4', width: `${((elevationDeg + 10) / 20) * 100}%` }}
                         />
                         <input
                             type="range"
-                            min="-30" max="60" step="1"
+                            min="-10" max="10" step="1"
+                            aria-label="Vertical angle slider"
                             value={elevationDeg}
                             onChange={(e) => setElevationDeg(Number(e.target.value))}
                             className="absolute inset-0 w-full z-10 m-0"
                         />
                     </div>
-                    <span className="text-[10px] font-medium text-zinc-600 w-6">60</span>
+                    <span className="text-[10px] font-medium text-zinc-600 w-6">10</span>
                 </div>
             </div>
 
@@ -155,16 +159,17 @@ export function SlidersConfiguration({
                             <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.5)]"></span>
                             <span className="text-zinc-200 text-[10px] sm:text-[11px] font-medium uppercase tracking-widest truncate">Distance</span>
                         </div>
-                        <p className="text-zinc-500 text-[9px] sm:text-[10px] font-medium tracking-wide pb-1 truncate">0.6=CLOSE-UP, 1.0=MEDIUM, 1.4=WIDE</p>
+                        <p className="text-zinc-500 text-[9px] sm:text-[10px] font-medium tracking-wide pb-1 truncate">0.85=CLOSER, 1.00=ORIGINAL, 1.15=FARTHER</p>
                     </div>
 
                     <div className="flex bg-black/40 border border-white/5 rounded-lg overflow-hidden backdrop-blur-md">
                         <input
                             type="number"
                             className="w-14 bg-transparent text-zinc-300 text-xs font-mono text-center outline-none py-1.5"
-                            value={distanceVal.toFixed(1)}
-                            onChange={(e) => setDistanceVal(Math.min(1.4, Math.max(0.6, Number(e.target.value))))}
-                            min="0.6" max="1.4" step="0.1"
+                            aria-label="Preview distance"
+                            value={distanceVal.toFixed(2)}
+                            onChange={(e) => setDistanceVal(Math.min(1.15, Math.max(0.85, Number(e.target.value))))}
+                            min="0.85" max="1.15" step="0.01"
                         />
                         <button
                             className="bg-white/5 px-2 hover:bg-white/10 transition-colors border-l border-white/5 text-zinc-500 hover:text-zinc-300 text-xs"
@@ -177,22 +182,23 @@ export function SlidersConfiguration({
                 </div>
 
                 <div className="flex items-center gap-4 w-full px-1">
-                    <span className="text-[10px] font-medium text-zinc-600 w-4">0.6</span>
+                    <span className="text-[10px] font-medium text-zinc-600 w-4">0.85</span>
                     <div className="relative flex-1 flex items-center h-6">
                         {/* Custom Track Fill */}
                         <div
                             className="absolute left-0 h-1 bg-amber-400 rounded-l pointer-events-none z-0"
-                            style={{ width: `${((distanceVal - 0.6) / 0.8) * 100}%` }}
+                            style={{ width: `${((distanceVal - 0.85) / 0.3) * 100}%` }}
                         />
                         <input
                             type="range"
-                            min="0.6" max="1.4" step="0.05"
+                            min="0.85" max="1.15" step="0.01"
+                            aria-label="Preview distance slider"
                             value={distanceVal}
                             onChange={(e) => setDistanceVal(Number(e.target.value))}
                             className="absolute inset-0 w-full z-10 m-0"
                         />
                     </div>
-                    <span className="text-[10px] font-medium text-zinc-600 w-6">1.4</span>
+                    <span className="text-[10px] font-medium text-zinc-600 w-6">1.15</span>
                 </div>
             </div>
 

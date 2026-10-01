@@ -4,23 +4,23 @@ import { Database, Zap, Cpu, Cloud } from 'lucide-react';
 const technologies = [
     {
         icon: <Database size={24} />,
-        title: 'Qwen-based Model',
-        description: 'Built on the robust Qwen vision-language model architecture for superior prompt adherence.',
+        title: 'Depth Anything V2 Small',
+        description: 'A free, open-source model estimates relative depth from visible image pixels.',
     },
     {
         icon: <Zap size={24} />,
-        title: 'LoRA Fine-tuning',
-        description: 'Low-Rank Adaptation enables fast and precise camera control without full model retraining.',
+        title: 'Cached Depth',
+        description: 'Estimate depth once per image and resolution, then reuse it for different camera positions.',
     },
     {
         icon: <Cpu size={24} />,
-        title: 'Diffusion Engines',
-        description: 'Advanced diffusion processes ensure photorealistic outputs and consistent geometry generation.',
+        title: 'Browser Inference',
+        description: 'Transformers.js and ONNX Runtime run in a worker on your device, without API keys.',
     },
     {
         icon: <Cloud size={24} />,
-        title: 'Cloud Inference',
-        description: 'Optimized cloud deployment pipeline for rapid, scalable generation with minimal latency.',
+        title: 'Static Hosting',
+        description: 'Vercel serves the app and browser runtime; your images are never sent to an inference service.',
     }
 ];
 

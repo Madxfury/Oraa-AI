@@ -11,7 +11,7 @@ export function Navbar() {
     const borderOpacity = useTransform(scrollY, [0, 50], [0, 0.08]);
 
     useEffect(() => {
-        return scrollY.onChange((latest) => setIsScrolled(latest > 20));
+        return scrollY.on("change", (latest) => setIsScrolled(latest > 20));
     }, [scrollY]);
 
     return (
@@ -47,7 +47,7 @@ export function Navbar() {
                         <span className="absolute bottom-0 left-0 w-full h-[1px] bg-white scale-x-0 origin-right transition-transform duration-300 group-hover:scale-x-100 group-hover:origin-left" />
                     </a>
                     <a
-                        href="https://huggingface.co/blog/kelseye/qwen-image-edit-2511-icedit-lora"
+                        href="https://github.com/DepthAnything/Depth-Anything-V2"
                         target="_blank"
                         rel="noopener noreferrer"
                         className="relative text-sm font-medium text-white/50 hover:text-white transition-colors group py-2"
@@ -77,14 +77,14 @@ export function Navbar() {
                         GitHub
                     </a>
                     <a
-                        href="https://huggingface.co/settings/tokens"
+                        href="https://github.com/DepthAnything/Depth-Anything-V2"
                         target="_blank"
                         rel="noopener noreferrer"
                         className="bg-white text-black px-3.5 py-2 sm:px-5 sm:py-2.5 rounded-full text-xs sm:text-sm font-semibold hover:scale-105 transition-transform shadow-[0_0_20px_rgba(255,255,255,0.2)] flex items-center gap-1.5 sm:gap-2"
                     >
                         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><path d="M12 8v4M12 16h.01" /></svg>
-                        <span className="hidden sm:inline">Get Hugging Face Token</span>
-                        <span className="inline sm:hidden">Get Token</span>
+                        <span className="hidden sm:inline">Free & Keyless</span>
+                        <span className="inline sm:hidden">Keyless</span>
                     </a>
                 </div>
             </div>

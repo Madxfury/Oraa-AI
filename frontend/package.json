@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@gradio/client": "^2.3.1",
+    "@huggingface/transformers": "3.8.1",
     "@react-three/drei": "^10.7.7",
     "@react-three/fiber": "^9.5.0",
     "@types/three": "^0.183.1",
